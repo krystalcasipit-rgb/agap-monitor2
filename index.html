@@ -252,19 +252,25 @@
       }
     });
 
-    // Direct Raw GitHub Fetch Engine (Bypasses GitHub Pages CDN Caching)
+    // GitHub REST API Engine (Completely Bypasses CDN Caching)
     async function fetchTelemetry() {
       try {
-        const rawUrl = 'https://raw.githubusercontent.com/krystalcasipit-rgb/agap-monitor2/main/alert.json?t=' + new Date().getTime();
+        const apiUrl = 'https://api.github.com/repos/krystalcasipit-rgb/agap-monitor2/contents/alert.json?timestamp=' + new Date().getTime();
         
-        const response = await fetch(rawUrl, {
-          cache: "no-store",
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
+        const response = await fetch(apiUrl, {
+          headers: { 
+            'Accept': 'application/vnd.github.v3+json',
+            'Cache-Control': 'no-cache' 
+          }
         });
 
         if (!response.ok) throw new Error('Network response was not ok');
 
-        const data = await response.json();
+        const apiResult = await response.json();
+        
+        // Decode Base64 JSON content returned by GitHub API
+        const decodedContent = atob(apiResult.content);
+        const data = JSON.parse(decodedContent);
         const timeString = new Date().toLocaleTimeString();
 
         // Update UI Cards
