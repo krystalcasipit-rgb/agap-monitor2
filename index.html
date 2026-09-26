@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A.G.A.P. Seizure Monitor — Live Dashboard</title>
+  <!-- Tailwind CSS & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @keyframes pulse-red {
+      0%, 100% { background-color: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 1); }
+      50% { background-color: rgba(239, 68, 68, 0.6); border-color: rgba(220, 38, 38, 1); }
+    }
+    .alert-active { animation: pulse-red 1.5s infinite; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl gap-4">
+      <div>
+        <h1 class="text-2xl font-bold tracking-wide text-white">A.G.A.P. Seizure Telemetry Dashboard</h1>
+        <p class="text-sm text-slate-400">Kapitolyo High School Research • Real-time Monitoring</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="connectionStatus" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Live Polling
+        </span>
+        <span id="lastUpdated" class="text-xs text-slate-400">Last fetch: Never</span>
+      </div>
+    </div>
+
+    <!-- Alert Status Banner -->
+    <div id="alertBanner" class="p-6 rounded-2xl bg-slate-800 border border-slate-700 shadow-lg text-center transition-all duration-300">
+      <h2 id="alertStatusText" class="text-xl font-semibold text-emerald-400">System Nominal — No Active Seizure Detected</h2>
+      <p id="alertSubText" class="text-sm text-slate-400 mt-1">Waiting for telemetry payloads from ESP32...</p>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- sEMG Card -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700/80 shadow-md">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">sEMG Signal</div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="emgVal" class="text-3xl font-extrabold text-blue-400">--</span>
+          <span class="text-sm text-slate-400">V</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Threshold: &gt; 2.01 V</p>
+      </div>
+
+      <!-- Accel Card -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700/80 shadow-md">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Acceleration</div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="accelVal" class="text-3xl font-extrabold text-amber-400">--</span>
+          <span class="text-sm text-slate-400">G</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Threshold: &gt; 2.50 G</p>
+      </div>
+
+      <!-- Gyro Card -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700/80 shadow-md">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Gyroscope</div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="gyroVal" class="text-3xl font-extrabold text-purple-400">--</span>
+          <span class="text-sm text-slate-400">deg/s</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Threshold: &gt; 300 deg/s</p>
+      </div>
+
+      <!-- HR Card -->
+      <div class="bg-slate-800 p-5 rounded-xl border border-slate-700/80 shadow-md">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Heart Rate</div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span id="hrVal" class="text-3xl font-extrabold text-rose-400">--</span>
+          <span class="text-sm text-slate-400">BPM</span>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Threshold: &gt; 120 BPM</p>
+      </div>
+
+    </div>
+
+    <!-- Chart -->
+    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+      <h3 class="text-lg font-semibold text-slate-200 mb-4">Sensor History & Trend</h3>
+      <div class="relative h-72 w-full">
+        <canvas id="telemetryChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const MAX_DATA_POINTS = 10;
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const telemetryChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'sEMG (V)', data: [], borderColor: '#38bdf8', backgroundColor: '#38bdf820', tension: 0.3, yAxisID: 'y' },
+          { label: 'Accel (G)', data: [], borderColor: '#fbbf24', backgroundColor: '#fbbf2420', tension: 0.3, yAxisID: 'y' },
+          { label: 'Heart Rate (BPM)', data: [], borderColor: '#fb7185', backgroundColor: '#fb718520', tension: 0.3, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+          y: { type: 'linear', position: 'left', ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, title: { display: true, text: 'Voltage / G Force', color: '#94a3b8' } },
+          y1: { type: 'linear', position: 'right', ticks: { color: '#fb7185' }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Heart Rate (BPM)', color: '#fb7185' } }
+        },
+        plugins: { legend: { labels: { color: '#e2e8f0' } } }
+      }
+    });
+
+    let lastLoggedTime = "";
+
+    async function fetchSensorData() {
+      try {
+        const response = await fetch('alert.json?nocache=' + new Date().getTime());
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const currentTimeString = new Date().toLocaleTimeString();
+
+        document.getElementById('emgVal').innerText = data.emg_volts !== undefined ? data.emg_volts : '--';
+        document.getElementById('accelVal').innerText = data.accel_g !== undefined ? data.accel_g : '--';
+        document.getElementById('gyroVal').innerText = data.gyro_dps !== undefined ? data.gyro_dps : '--';
+        document.getElementById('hrVal').innerText = data.heart_rate !== undefined ? data.heart_rate : '--';
+        document.getElementById('lastUpdated').innerText = 'Last fetch: ' + currentTimeString;
+
+        const banner = document.getElementById('alertBanner');
+        const alertStatusText = document.getElementById('alertStatusText');
+
+        if (data.status === 'ALERT') {
+          banner.className = 'p-6 rounded-2xl alert-active text-center border-2 shadow-xl';
+          alertStatusText.className = 'text-2xl font-black text-red-500 uppercase tracking-widest';
+          alertStatusText.innerText = '🚨 CRITICAL SEIZURE ALERT DETECTED! 🚨';
+          document.getElementById('alertSubText').innerText = 'Immediate medical attention required!';
+        } else {
+          banner.className = 'p-6 rounded-2xl bg-slate-800 border border-slate-700 shadow-lg text-center';
+          alertStatusText.className = 'text-xl font-semibold text-emerald-400';
+          alertStatusText.innerText = 'System Nominal — Monitoring Active';
+          document.getElementById('alertSubText').innerText = 'ESP32 heartbeat nominal.';
+        }
+
+        if (lastLoggedTime !== currentTimeString) {
+          lastLoggedTime = currentTimeString;
+          if (telemetryChart.data.labels.length >= MAX_DATA_POINTS) {
+            telemetryChart.data.labels.shift();
+            telemetryChart.data.datasets[0].data.shift();
+            telemetryChart.data.datasets[1].data.shift();
+            telemetryChart.data.datasets[2].data.shift();
+          }
+          telemetryChart.data.labels.push(currentTimeString);
+          telemetryChart.data.datasets[0].data.push(data.emg_volts || 0);
+          telemetryChart.data.datasets[1].data.push(data.accel_g || 0);
+          telemetryChart.data.datasets[2].data.push(data.heart_rate || 0);
+          telemetryChart.update();
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }
+
+    setInterval(fetchSensorData, 3000);
+    fetchSensorData();
+  </script>
+</body>
+</html>
