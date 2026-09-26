@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AGAP Monitor — Live Telemetry</title>
+  <!-- Chart.js Library for Real-Time Line Graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -13,6 +15,7 @@
       --status-nominal: #22c55e;
       --status-alert: #ef4444;
       --accent-blue: #38bdf8;
+      --accent-purple: #a855f7;
     }
 
     * {
@@ -51,7 +54,7 @@
 
     .status-banner {
       width: 100%;
-      max-width: 800px;
+      max-width: 850px;
       padding: 1.2rem;
       border-radius: 12px;
       background-color: var(--card-bg);
@@ -80,7 +83,8 @@
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 1.5rem;
       width: 100%;
-      max-width: 800px;
+      max-width: 850px;
+      margin-bottom: 2rem;
     }
 
     .card {
@@ -111,6 +115,24 @@
       margin-left: 0.2rem;
     }
 
+    /* Line Graph Card Container */
+    .chart-container {
+      width: 100%;
+      max-width: 850px;
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .chart-container h3 {
+      font-size: 1rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1rem;
+    }
+
     footer {
       margin-top: 3rem;
       color: var(--text-muted);
@@ -118,7 +140,7 @@
       text-align: center;
     }
 
-    /* Alert Banner Modifier */
+    /* Alert Banner Styling */
     .status-banner.alert-active {
       background-color: var(--status-alert);
     }
@@ -143,8 +165,11 @@
 
   <div class="grid-container">
     <div class="card">
-      <h3>EMG Voltage</h3>
-      <div class="metric"><span id="emg">0.00</span><span class="unit">V</span></div>
+      <h3>EMG Raw / Volts</h3>
+      <div class="metric"><span id="emg-raw">0</span> <span class="unit">raw</span></div>
+      <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.3rem;">
+        <span id="emg-volts">0.00</span> V
+      </div>
     </div>
 
     <div class="card">
@@ -163,30 +188,100 @@
     </div>
   </div>
 
+  <!-- Real-Time Line Graph Display -->
+  <div class="chart-container">
+    <h3>Live Telemetry Trend</h3>
+    <canvas id="telemetryChart"></canvas>
+  </div>
+
   <footer>
     Last update checked: <span id="last-updated">Never</span>
   </footer>
 
   <script>
+    // Maximum number of entries displayed on the graph history
+    const MAX_DATA_POINTS = 15;
+
+    // Initialize Chart.js Instance
+    const ctx = document.getElementById('telemetryChart').getContext('2d');
+    const telemetryChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'EMG Voltage (V)',
+            data: [],
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.15)',
+            fill: true,
+            tension: 0.3,
+            yAxisID: 'yEMG'
+          },
+          {
+            label: 'Heart Rate (BPM)',
+            data: [],
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.15)',
+            fill: true,
+            tension: 0.3,
+            yAxisID: 'yHR'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#94a3b8' }
+          },
+          yEMG: {
+            type: 'linear',
+            position: 'left',
+            title: { display: true, text: 'EMG (V)', color: '#38bdf8' },
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#38bdf8' },
+            min: 0,
+            max: 3.3
+          },
+          yHR: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'Heart Rate (BPM)', color: '#a855f7' },
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#a855f7' },
+            min: 40,
+            max: 160
+          }
+        },
+        plugins: {
+          legend: {
+            labels: { color: '#f8fafc' }
+          }
+        }
+      }
+    });
+
     async function fetchTelemetry() {
       try {
-        // Cache-busting query parameter forces fetching the newest alert.json file
         const response = await fetch('./alert.json?t=' + new Date().getTime());
         if (!response.ok) throw new Error('Failed to load telemetry payload');
 
         const data = await response.json();
 
-        // Update DOM text
+        // Update Card DOM Elements
         document.getElementById('status').innerText = data.status || 'UNKNOWN';
-        document.getElementById('emg').innerText = data.emg_volts !== undefined ? data.emg_volts.toFixed(2) : '0.00';
-        document.getElementById('accel').innerText = data.accel_g !== undefined ? data.accel_g.toFixed(2) : '0.00';
+        document.getElementById('emg-raw').innerText = data.emg_raw !== undefined ? data.emg_raw : '0';
+        document.getElementById('emg-volts').innerText = data.emg_volts !== undefined ? Number(data.emg_volts).toFixed(2) : '0.00';
+        document.getElementById('accel').innerText = data.accel_g !== undefined ? Number(data.accel_g).toFixed(2) : '0.00';
         document.getElementById('gyro').innerText = data.gyro_dps !== undefined ? data.gyro_dps : '0';
         document.getElementById('hr').innerText = data.heart_rate !== undefined ? data.heart_rate : '0';
 
-        // Update Banner Style depending on ALERT or NOMINAL state
+        // Update Status Banner Styling
         const statusCard = document.getElementById('status-card');
         const statusText = document.getElementById('status');
-
         if (data.status === 'ALERT') {
           statusCard.classList.add('alert-active');
         } else {
@@ -194,13 +289,27 @@
           statusText.style.color = 'var(--status-nominal)';
         }
 
-        document.getElementById('last-updated').innerText = new Date().toLocaleTimeString();
+        // Add Timestamp and Data to Chart
+        const timeLabel = new Date().toLocaleTimeString();
+        telemetryChart.data.labels.push(timeLabel);
+        telemetryChart.data.datasets[0].data.push(data.emg_volts || 0);
+        telemetryChart.data.datasets[1].data.push(data.heart_rate || 0);
+
+        // Limit the number of visible points to scroll the chart smoothly
+        if (telemetryChart.data.labels.length > MAX_DATA_POINTS) {
+          telemetryChart.data.labels.shift();
+          telemetryChart.data.datasets[0].data.shift();
+          telemetryChart.data.datasets[1].data.shift();
+        }
+
+        telemetryChart.update();
+        document.getElementById('last-updated').innerText = timeLabel;
       } catch (error) {
         console.error('Telemetry fetch error:', error);
       }
     }
 
-    // Refresh every 3 seconds to stay synced with ESP32 updates
+    // Poll alert.json every 3 seconds
     setInterval(fetchTelemetry, 3000);
     fetchTelemetry();
   </script>
