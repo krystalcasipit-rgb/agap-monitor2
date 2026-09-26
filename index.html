@@ -252,11 +252,12 @@
       }
     });
 
-    // Cache-Busting Data Fetch Engine
+    // Direct Raw GitHub Fetch Engine (Bypasses GitHub Pages CDN Caching)
     async function fetchTelemetry() {
       try {
-        // Appending timestamp '?t=' forces browser/GitHub CDN to fetch fresh file every cycle
-        const response = await fetch('alert.json?t=' + new Date().getTime(), {
+        const rawUrl = 'https://raw.githubusercontent.com/krystalcasipit-rgb/agap-monitor2/main/alert.json?t=' + new Date().getTime();
+        
+        const response = await fetch(rawUrl, {
           cache: "no-store",
           headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
