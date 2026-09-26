@@ -252,35 +252,29 @@
       }
     });
 
-    // GitHub REST API Engine (Completely Bypasses CDN Caching)
+    // Zero-Cache Fetch Engine via Commit SHA
     async function fetchTelemetry() {
       try {
-        const apiUrl = 'https://api.github.com/repos/krystalcasipit-rgb/agap-monitor2/contents/alert.json?timestamp=' + new Date().getTime();
-        
-        const response = await fetch(apiUrl, {
-          headers: { 
-            'Accept': 'application/vnd.github.v3+json',
-            'Cache-Control': 'no-cache' 
-          }
+        // 1. Get latest commit SHA to bypass all GitHub CDN caching
+        const commitRes = await fetch('https://api.github.com/repos/krystalcasipit-rgb/agap-monitor2/commits?path=alert.json&per_page=1', {
+          headers: { 'Cache-Control': 'no-cache' }
         });
+        const commitData = await commitRes.json();
+        const latestSha = commitData[0].sha;
 
-        if (!response.ok) throw new Error('Network response was not ok');
-
-        const apiResult = await response.json();
-        
-        // Decode Base64 JSON content returned by GitHub API
-        const decodedContent = atob(apiResult.content);
-        const data = JSON.parse(decodedContent);
+        // 2. Fetch raw file directly using exact commit hash endpoint
+        const fileRes = await fetch(`https://raw.githubusercontent.com/krystalcasipit-rgb/agap-monitor2/${latestSha}/alert.json`);
+        const data = await fileRes.json();
         const timeString = new Date().toLocaleTimeString();
 
-        // Update UI Cards
+        // 3. Update UI Cards
         document.getElementById('valEmg').innerText = `${data.emg_volts.toFixed(2)} V`;
         document.getElementById('valAccel').innerText = `${data.accel_g.toFixed(2)} G`;
         document.getElementById('valGyro').innerText = `${data.gyro_dps.toFixed(0)} deg/s`;
         document.getElementById('valHr').innerText = `${data.heart_rate} BPM`;
         document.getElementById('lastFetch').innerText = `Last fetch: ${timeString}`;
 
-        // Update Alert Banner
+        // 4. Update Status Banner
         const banner = document.getElementById('statusBanner');
         const title = document.getElementById('statusTitle');
         const sub = document.getElementById('statusSub');
@@ -295,7 +289,7 @@
           sub.innerText = 'ESP32 heartbeat nominal.';
         }
 
-        // Update Chart
+        // 5. Update Chart
         if (chart.data.labels.length >= maxDataPoints) {
           chart.data.labels.shift();
           chart.data.datasets[0].data.shift();
