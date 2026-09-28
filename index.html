@@ -49,7 +49,7 @@
         const options = {
             clientId: 'web_dashboard_' + Math.random().toString(16).substring(2, 8),
             username: 'Breadisgood',
-            password: 'Krystala_1527', // Replace with your HiveMQ password
+            password: 'Krystala_1527',
             clean: true
         };
 
@@ -58,11 +58,17 @@
 
         client.on('connect', function () {
             console.log("Connected to HiveMQ live stream!");
+            document.getElementById('status').innerText = "Connected (Waiting for data...)";
             client.subscribe('agap/telemetry', function (err) {
                 if (!err) {
                     console.log("Subscribed to agap/telemetry");
                 }
             });
+        });
+
+        client.on('error', function (error) {
+            console.error("Connection error: ", error);
+            document.getElementById('status').innerText = "Connection Failed";
         });
 
         // Instantly update elements when a new message comes from your ESP32
