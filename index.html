@@ -266,7 +266,8 @@
 
     async function fetchTelemetry() {
       try {
-        const response = await fetch('./alert.json?t=' + new Date().getTime());
+        // Uses cache: 'no-store' and timestamp to prevent caching old static data
+        const response = await fetch('./alert.json?t=' + Date.now(), { cache: 'no-store' });
         if (!response.ok) throw new Error('Failed to load telemetry payload');
 
         const data = await response.json();
