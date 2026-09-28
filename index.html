@@ -43,14 +43,17 @@
     </div>
 
     <script>
-        // HiveMQ Cloud WebSocket connection details
+        // HiveMQ Cloud WebSocket connection details (Port 8884)
         const brokerUrl = 'wss://4f91cb700d614ff8ad3d9d429225c7db.s1.eu.hivemq.cloud:8884/mqtt';
 
         const options = {
             clientId: 'web_dashboard_' + Math.random().toString(16).substring(2, 8),
             username: 'Breadisgood',
             password: 'Krystala_1527',
-            clean: true
+            protocolId: 'MQTT',
+            protocolVersion: 4,
+            clean: true,
+            reconnectPeriod: 1000
         };
 
         console.log("Connecting to HiveMQ broker...");
@@ -59,9 +62,11 @@
         client.on('connect', function () {
             console.log("Connected to HiveMQ live stream!");
             document.getElementById('status').innerText = "Connected (Waiting for data...)";
-            client.subscribe('agap/telemetry', function (err) {
+            client.subscribe('agap/telemetry', { qos: 0 }, function (err) {
                 if (!err) {
-                    console.log("Subscribed to agap/telemetry");
+                    console.log("Subscribed to agap/telemetry successfully");
+                } else {
+                    console.error("Subscription failed", err);
                 }
             });
         });
