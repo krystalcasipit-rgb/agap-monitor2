@@ -6,7 +6,7 @@ A wearable seizure detection device powered by ESP32-C3 that continuously monito
 
 ## Live Dashboard
 Access the live monitoring web dashboard here:  
-`https://krystalcasipit-rgb.github.io/agap-monitor/`
+`https://krystalcasipit-rgb.github.io/agap-monitor2/`
 
 ## Sensor Specifications & Thresholds
 - **sEMG Sensor**: Muscle spasms (> 2.01 V / 2500 raw threshold)
