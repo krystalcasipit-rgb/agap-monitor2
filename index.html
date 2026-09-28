@@ -199,10 +199,8 @@
   </footer>
 
   <script>
-    // Maximum number of entries displayed on the graph history
     const MAX_DATA_POINTS = 15;
 
-    // Initialize Chart.js Instance
     const ctx = document.getElementById('telemetryChart').getContext('2d');
     const telemetryChart = new Chart(ctx, {
       type: 'line',
@@ -267,13 +265,13 @@
 
         const data = await response.json();
 
-        // Update Card DOM Elements
+        // Update Card DOM Elements safely handling multiple property names
         document.getElementById('status').innerText = data.status || 'UNKNOWN';
-        document.getElementById('emg-raw').innerText = data.emg_raw !== undefined ? data.emg_raw : '0';
-        document.getElementById('emg-volts').innerText = data.emg_volts !== undefined ? Number(data.emg_volts).toFixed(2) : '0.00';
-        document.getElementById('accel').innerText = data.accel_g !== undefined ? Number(data.accel_g).toFixed(2) : '0.00';
-        document.getElementById('gyro').innerText = data.gyro_dps !== undefined ? data.gyro_dps : '0';
-        document.getElementById('hr').innerText = data.heart_rate !== undefined ? data.heart_rate : '0';
+        document.getElementById('emg-raw').innerText = data.emg_raw ?? data.emgRaw ?? '0';
+        document.getElementById('emg-volts').innerText = Number(data.emg_volts ?? data.emgVolts ?? 0).toFixed(2);
+        document.getElementById('accel').innerText = Number(data.accel_g ?? data.accelG ?? 0).toFixed(2);
+        document.getElementById('gyro').innerText = data.gyro_dps ?? data.gyroDps ?? '0';
+        document.getElementById('hr').innerText = data.heart_rate ?? data.heartRate ?? data.hr ?? '0';
 
         // Update Status Banner Styling
         const statusCard = document.getElementById('status-card');
@@ -288,10 +286,9 @@
         // Add Timestamp and Data to Chart
         const timeLabel = new Date().toLocaleTimeString();
         telemetryChart.data.labels.push(timeLabel);
-        telemetryChart.data.datasets[0].data.push(data.emg_volts || 0);
-        telemetryChart.data.datasets[1].data.push(data.heart_rate || 0);
+        telemetryChart.data.datasets[0].data.push(Number(data.emg_volts ?? data.emgVolts ?? 0));
+        telemetryChart.data.datasets[1].data.push(Number(data.heart_rate ?? data.heartRate ?? data.hr ?? 0));
 
-        // Limit the number of visible points to scroll the chart smoothly
         if (telemetryChart.data.labels.length > MAX_DATA_POINTS) {
           telemetryChart.data.labels.shift();
           telemetryChart.data.datasets[0].data.shift();
